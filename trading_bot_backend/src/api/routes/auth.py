@@ -1,7 +1,10 @@
 """
-Authentication routes skeleton.
+Authentication routes.
 """
 from fastapi import APIRouter, Depends
+from fastapi import HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+
 from src.services.auth_service import AuthService, LoginRequest, SignupRequest
 from src.core.security import Token, get_current_user
 
@@ -11,9 +14,21 @@ _service = AuthService()
 
 @router.post("/login", response_model=Token, summary="Login", description="Authenticate and receive an access token.")
 # PUBLIC_INTERFACE
-def login(data: LoginRequest) -> Token:
-    """Authenticate a user and return an access token."""
-    return _service.login(data)
+def login(data: LoginRequest | None = None, form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
+    """
+    Authenticate a user and return an access token.
+
+    Supports:
+    - JSON body LoginRequest
+    - OAuth2PasswordRequestForm (preferred by Swagger)
+    """
+    if data is None:
+        # Use form data
+        data = LoginRequest(email=form_data.username, password=form_data.password)
+    token = _service.login(data)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    return token
 
 
 @router.post("/signup", summary="Signup", description="Create a new user account.")
